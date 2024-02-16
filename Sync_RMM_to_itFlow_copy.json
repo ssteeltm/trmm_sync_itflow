@@ -1,0 +1,870 @@
+{
+  "name": "Sync RMM to itFlow copy",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5fe05a3f-15e4-4312-8483-69b01e0ba739",
+      "name": "On clicking 'execute'",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        320,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Setup').item.json.itflow.apiUrl }}/assets/create.php",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Dispositivo').item.json[\"payload\"]) }}",
+        "options": {}
+      },
+      "id": "aa440fcc-165a-40f7-b7ed-e723c4445220",
+      "name": "itFlow - Create Asset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        2500,
+        580
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $node['Setup'].json.itflow.apiUrl }}/clients/read.php ",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $node['Setup'].json.itflow.apiKey }}"
+            },
+            {
+              "name": "limit",
+              "value": "99999"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "36d3189b-660a-490b-b33f-ab39e9c25e49",
+      "name": "itFlow - Get Clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        600,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "=data",
+        "options": {}
+      },
+      "id": "b95cb4d1-127d-41a3-bfa1-c529727564f8",
+      "name": "Item Lists",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 1,
+      "position": [
+        820,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "chooseBranch"
+      },
+      "id": "92b44a49-dfde-4283-bcd7-7544e54b23c6",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "itflow.client_id",
+              "value": "={{ $json.client_id }}"
+            },
+            {
+              "name": "itflow.client_name",
+              "value": "={{ $json.client_name }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8e685f99-7704-4edf-8ab9-272832815890",
+      "name": "Set",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $('Setup').item.json.itflow.apiUrl }}/assets/read.php",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "client_id",
+              "value": "={{ $json.client.client_id }}"
+            },
+            {
+              "name": "asset_name",
+              "value": "={{ $json.payload.asset_name }}"
+            },
+            {
+              "name": "api_key",
+              "value": "={{ $('Setup').item.json.itflow.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "140adf73-4156-4fd7-8df5-7208608255de",
+      "name": "itFlow - Get Asset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        2580,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "aggregateItems",
+        "aggregate": "aggregateAllItemData",
+        "destinationFieldName": "rmm"
+      },
+      "id": "bc5bf31f-f109-4081-b488-623920e982ca",
+      "name": "rmm clients",
+      "type": "n8n-nodes-base.itemLists",
+      "typeVersion": 1,
+      "position": [
+        820,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let rmm_clients = $node['rmm clients'].json.rmm;\n\n\nfor (const item of $input.all()) {\n\n  let rmm = rmm_clients.find( x=> x.name == item.json.itflow.client_name ) \n  if(rmm){\n    item.json.importarAgentes = true;\n    item.json.rmm = rmm;\n  }else{\n    item.json.importarAgentes = false;\n  }\n}\n\nreturn $input.all();"
+      },
+      "id": "85d40947-6074-4860-8fed-5799388db68e",
+      "name": "Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        1400,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.importarAgentes }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "dcc31729-9ad2-4872-8618-eb9540885ebb",
+      "name": "Importar Agentes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1620,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "45751f3f-25f6-4a2c-a45f-8e83e24ec5c7",
+      "name": "SplitInBatches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.success }}",
+              "value2": "=True"
+            }
+          ]
+        }
+      },
+      "id": "963b9664-2428-4cbc-bc81-89ca687ec514",
+      "name": "Agente existe no itflow?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        560
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "1bb20592-6d6a-40f5-9493-24c115518c3f",
+      "name": "Next Client",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1860,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "c361aa65-08ad-44a1-a01a-4f894d06f17b",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        320,
+        -120
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Dont use TRMM node, its bugging the all n8n",
+        "height": 80,
+        "width": 542.2172452407615
+      },
+      "id": "df8d42db-63ad-41b8-96ef-02529da4a90c",
+      "name": "Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -180,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let assets = [];\nlet x;\n\n\n\nfor (const item of $input.all()) {\n  x = {};\n  x.payload = {};\n\n  x.payload.asset_name = item.json.hostname;\n  x.payload.asset_description = item.json.description;\n  x.payload.asset_model = item.json.make_model.replace('\\n','');\n  \n  //x.payload.asset_type = item.json.monitoring_type == 'workstation' ? 'Desktop' : 'Server';\n  if(item.json.monitoring_type == 'workstation'){\n    x.payload.asset_type = 'Desktop'\n  }else{\n    if(item.json.monitoring_type == 'server'){\n      if(x.payload.asset_model.includes('QEMU'))\n        x.payload.asset_type = 'Virtual Machine'\n      else\n        x.payload.asset_type = 'Server'\n    }\n  }\n  \n  x.payload.asset_serial = item.json.serial_number;\n  \n  x.payload.asset_os = item.json.operating_system;\n\n  try{\n  //analise de qual index escolher, excluindo ipv6 ips zerotier etc\n  item.json.local_ips.split(',').forEach(function(ip,index,arr){\n         if(ip.includes(\"error\") || ip.includes(\"::\") || ip.includes(\"2804:\") ){\n           x.payload.asset_ip = '';\n         }else{\n           if( ip.includes('10.147.') || ip.includes('169.254') ){\n             x.payload.asset_ip = '';\n           }else{\n             x.payload.asset_ip = ip.split('/')[0];\n             throw new Error(\"Fim\");\n           }\n         }\n      })\n  }catch (error) {\n  console.error(error.message);\n}\n\n  \n\n\n  // pegar o last_seen e comparar, caso offline a muito tempo, virar Retired\n  x.payload.asset_status = \"Deployed\";\n\n  \n  // cpu, contar quantos tem e mostrar numero X nome\n  x.payload.asset_notes = item.json.cpu_model.length + ' x ' + item.json.cpu_model[0] + '\\n' \n    + item.json.graphics + '\\n';\n  // mostra discos\n  item.json.physical_disks.forEach(function(disk,index,arr){\n          x.payload.asset_notes += disk + '\\n'\n      })\n\n\n\n  x.payload.asset_uri = $node['Setup'].json.rmm.rmmUrl + \"/agents/\"+ item.json.agent_id\n    \n  x.client = $node['SplitInBatches'].json.itflow \n  x.payload.api_key = $node['Setup'].json.itflow.apiKey;\n  x.payload.client_id = x.client.client_id;\n\n   x.payload.client_id = x.client.client_id;\n   \n  \n  assets.push(x); \n}\n\nreturn assets;"
+      },
+      "id": "6f62ba46-7095-44aa-afa8-4f738da2467d",
+      "name": "Dispositivo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        2280,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $node['Setup'].json.itflow.apiUrl }}/clients/create.php",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "api_key",
+              "value": "={{ $node['Setup'].json.itflow.apiKey }}"
+            },
+            {
+              "name": "client_name",
+              "value": "={{ $json.name }}"
+            },
+            {
+              "name": "client_type"
+            },
+            {
+              "name": "client_website"
+            },
+            {
+              "name": "client_referral"
+            },
+            {
+              "name": "client_rate"
+            },
+            {
+              "name": "client_net_terms"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7a28b544-9bc5-4635-a0a3-5fbc4ab2600c",
+      "name": "itFlow - Create Client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1220,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Setup').item.json.itflow.apiUrl }}/assets/update.php",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "4edde596-6c99-4ce2-82ba-8d91ddfe038d",
+      "name": "itFlow - Update Asset",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        2940,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "api_key",
+              "value": "={{ $('Dispositivo').item.json.payload.api_key }}"
+            },
+            {
+              "name": "client_id",
+              "value": "={{ $('Dispositivo').item.json.payload.client_id }}"
+            },
+            {
+              "name": "asset_id",
+              "value": "={{ $json.data[0].asset_id }}"
+            },
+            {
+              "name": "asset_description",
+              "value": "={{ $('Dispositivo').item.json.payload.asset_description }}"
+            },
+            {
+              "name": "asset_ip",
+              "value": "={{ $('Dispositivo').item.json.payload.asset_ip }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "70bf953a-a5e0-48e6-9750-74ae00f7ecf4",
+      "name": "Set1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        2680,
+        840
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Direction of this Sync:\n## RMM to ITFlow",
+        "height": 130.30235162374035,
+        "width": 344.81522956326967
+      },
+      "id": "a09bfd73-6da4-4aec-aad0-0bd2e3ba780e",
+      "name": "Note1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -180,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.data[0].asset_description }}",
+              "operation": "notEqual",
+              "value2": "={{ $('Dispositivo').item.json.payload.asset_description}}"
+            },
+            {
+              "value1": "={{ $json.data[0].asset_ip.trim() }}",
+              "operation": "notEqual",
+              "value2": "={{ $('Dispositivo').item.json.payload.asset_ip.trim()}}"
+            }
+          ]
+        },
+        "combineOperation": "any"
+      },
+      "id": "cf99d6c0-5a43-4b32-a1e5-ccfeb76c6b29",
+      "name": "Campos DESAtualizados?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2420,
+        820
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $node['Setup'].json.rmm.apiUrl }}/clients",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "={{ $node['Setup'].json.rmm.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "94e25deb-cfa3-4c43-a8d8-14bb9ec1b0e6",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        600,
+        480
+      ],
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "url": "={{ $node['Setup'].json.rmm.apiUrl }}/agents",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "client",
+              "value": "={{ $json.rmm.id }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-KEY",
+              "value": "={{ $node['Setup'].json.rmm.apiKey }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e98fe3dc-c7cb-4e02-90c0-12a76d3fc1ca",
+      "name": "HTTP Request1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        2040,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "content": "# TODO\n\n## MAP TRMM SITE TO ITFLOW LOCATION\n\n",
+        "height": 352.16125419932814,
+        "width": 566.6741321388578
+      },
+      "id": "a9726bfa-cd1e-44df-90c9-8edb3070fa69",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -180,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "let itflow_clients = $node['itFlow - Get Clients'].json.data;\nlet criarClientes = []; \n\n\nfor (const item of $input.all()) {\n\n  let itflow = itflow_clients.find( x=> x.client_name == item.json.name ) \n  \n  if(itflow){\n    //cliente rmm existe no itflow\n  }else{\n    //cliente rmm nao existe no itflow\n\n    //setup excluded clients from sync\n    let exclusao = []\n    exclusao.push(\"aaaa - Clientes Avulsos\")\n    exclusao.push(\"aaa NewGATE\")\n    exclusao.push(\"aaa New Install\")\n    \n    \n    if(exclusao.includes(item.json.name) )\n      continue\n    \n    criarClientes.push(item.json)\n    //break\n  }\n}\n\nreturn criarClientes"
+      },
+      "id": "23e4d837-13c5-4365-8350-d43e666bb072",
+      "name": "Clients to Create",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        820,
+        720
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "5769aaa2-d3db-4d5b-b4e9-c29005466992",
+      "name": "IF",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        1000,
+        720
+      ]
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "itflow.apiUrl",
+              "value": "=https://itflow.yourdomain.com/api/v1"
+            },
+            {
+              "name": "itflow.apiKey",
+              "value": "="
+            },
+            {
+              "name": "rmm.apiUrl",
+              "value": "https://api.yourdomain.com"
+            },
+            {
+              "name": "rmm.rmmUrl",
+              "value": "https://rmm.yourdomain.com"
+            },
+            {
+              "name": "rmm.apiKey"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "36c39ee7-4599-42bc-b729-febe7916c9d3",
+      "name": "Setup",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [
+        600,
+        40
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "itFlow - Get Clients": {
+      "main": [
+        [
+          {
+            "node": "Item Lists",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Item Lists": {
+      "main": [
+        [
+          {
+            "node": "Set",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On clicking 'execute'": {
+      "main": [
+        [
+          {
+            "node": "Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "rmm clients": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Importar Agentes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Importar Agentes?": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "SplitInBatches": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itFlow - Get Asset": {
+      "main": [
+        [
+          {
+            "node": "Agente existe no itflow?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agente existe no itflow?": {
+      "main": [
+        [
+          {
+            "node": "Campos DESAtualizados?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "itFlow - Create Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itFlow - Create Asset": {
+      "main": [
+        [
+          {
+            "node": "Next Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Next Client": {
+      "main": [
+        [
+          {
+            "node": "SplitInBatches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Setup",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispositivo": {
+      "main": [
+        [
+          {
+            "node": "itFlow - Get Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "itFlow - Update Asset": {
+      "main": [
+        [
+          {
+            "node": "Next Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set1": {
+      "main": [
+        [
+          {
+            "node": "itFlow - Update Asset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Campos DESAtualizados?": {
+      "main": [
+        [
+          {
+            "node": "Set1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Next Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "rmm clients",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Clients to Create",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Dispositivo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clients to Create": {
+      "main": [
+        [
+          {
+            "node": "IF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF": {
+      "main": [
+        [
+          {
+            "node": "itFlow - Create Client",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup": {
+      "main": [
+        [
+          {
+            "node": "itFlow - Get Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "none",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "ab88abe5-3f19-45a3-a1c9-f5a021d3725e",
+  "id": "aKwFYBoydQsZwx9G",
+  "meta": {
+    "instanceId": "975eba26f021425eb6152a0de419b496fc2d80b28ab5e4f2ae8633a66ee7660b"
+  },
+  "tags": [
+    {
+      "name": "HugoSampaio",
+      "id": "3QiMBWGhl4mbaRGS",
+      "createdAt": "2024-02-16T16:27:43.366Z",
+      "updatedAt": "2024-02-16T16:27:43.366Z"
+    }
+  ]
+}
